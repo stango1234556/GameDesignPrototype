@@ -19,11 +19,18 @@ public class PlayerController : MonoBehaviour
     private bool _jumpTriggered;
     private PlayerInputController _playerInputController;
 
+    [SerializeField] private Transform grabPoint;
+    [SerializeField] private float grabRange = 1.5f;
+    [SerializeField] private LayerMask grabbableLayer;
+    private FixedJoint grabJoint;
+    private Rigidbody grabbedRb;
+
     private void Awake(){
         _playerInputController = GetComponent<PlayerInputController>();
         _rigidbody = GetComponent<Rigidbody>();
 
         _playerInputController.OnJumpButtonPressed += JumpButtonPressed;
+        _playerInputController.OnGrabInputChanged += HandleGrab;
     }
 
     void Update(){
@@ -54,6 +61,36 @@ public class PlayerController : MonoBehaviour
 
     void GatherInput() {
         _input = new Vector3(_playerInputController.MovementInputVector.x, 0, _playerInputController.MovementInputVector.y);
+    }
+
+    private void HandleGrab(bool isGrabbing){
+        if (isGrabbing)
+        {
+            if (grabJoint != null) return; // already holding
+
+            Collider[] hits = Physics.OverlapSphere(grabPoint.position, grabRange);
+
+            foreach (var hit in hits)
+            {
+                if (hit.CompareTag("Grabbable") && hit.attachedRigidbody != null)
+                {
+                    grabJoint = gameObject.AddComponent<FixedJoint>();
+                    grabJoint.connectedBody = hit.attachedRigidbody;
+                    grabbedRb = hit.attachedRigidbody;
+                    break;
+                }
+            }
+        }
+        else
+        {
+            if (grabJoint != null)
+            {
+                grabJoint.connectedBody = null;
+                Destroy(grabJoint);
+                grabJoint = null;
+                grabbedRb = null;
+            }
+        }
     }
 
     void Look(){
