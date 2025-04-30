@@ -1,58 +1,68 @@
-using UnityEngine;
 using System.Collections;
+using UnityEngine;
 
+[RequireComponent(typeof(Rigidbody))]
 public class MovingPlatform : MonoBehaviour
 {
     public float moveDistance = 3f;
     public float moveSpeed = 2f;
     public float pauseDuration = 1f;
 
-    private Vector3 startPos;
-    private Vector3 targetPos;
-    private bool movingUp = true;
+    private Vector3 _startPos;
+    private Vector3 _endPos;
+    private Vector3 _targetPos;
+    private Vector3 _lastPosition;
+    public Vector3 DeltaMovement { get; private set; }
 
-    void Start()
+    private Rigidbody _rb;
+    private bool _isPaused = false;
+
+    private void Start()
     {
-        startPos = transform.position;
-        StartCoroutine(MovePlatform());
+        _startPos = transform.position;
+        _endPos = _startPos + Vector3.up * moveDistance;
+        _targetPos = _endPos;
+
+        _lastPosition = transform.position;
+
+        _rb = GetComponent<Rigidbody>();
+        _rb.isKinematic = true;
+
+        StartCoroutine(SwitchDirection());
     }
 
-    IEnumerator MovePlatform()
+    private void FixedUpdate()
+    {
+        if (_isPaused) return;
+
+        Vector3 newPos = Vector3.MoveTowards(transform.position, _targetPos, moveSpeed * Time.fixedDeltaTime);
+        _rb.MovePosition(newPos);
+    }
+
+    private void LateUpdate()
+    {
+        DeltaMovement = transform.position - _lastPosition;
+        _lastPosition = transform.position;
+    }
+
+    private IEnumerator SwitchDirection()
     {
         while (true)
         {
-            // Set the target position based on direction
-            targetPos = startPos + (movingUp ? Vector3.up * moveDistance : Vector3.zero);
-
-            // Move until close to target
-            while (Vector3.Distance(transform.position, targetPos) > 0.01f)
+            // Wait until platform reaches target
+            while (Vector3.Distance(transform.position, _targetPos) > 0.01f)
             {
-                transform.position = Vector3.MoveTowards(transform.position, targetPos, moveSpeed * Time.deltaTime);
                 yield return null;
             }
 
-            // Snap exactly and pause
-            transform.position = targetPos;
+            // Snap to position and pause
+            _rb.MovePosition(_targetPos);
+            _isPaused = true;
             yield return new WaitForSeconds(pauseDuration);
 
-            // Toggle direction
-            movingUp = !movingUp;
-        }
-    }
-
-    private void OnCollisionEnter(Collision collision)
-    {
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            collision.transform.SetParent(transform);
-        }
-    }
-
-    private void OnCollisionExit(Collision collision)
-    {
-        if (collision.gameObject.CompareTag("Player"))
-        {
-            collision.transform.SetParent(null);
+            // Flip direction and resume
+            _targetPos = (_targetPos == _startPos) ? _endPos : _startPos;
+            _isPaused = false;
         }
     }
 }
