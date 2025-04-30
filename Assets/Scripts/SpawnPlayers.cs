@@ -6,6 +6,8 @@ public class PlayerManager : MonoBehaviour
     public GameObject playerPrefab;
     public PlayerTetherManager tetherManager;
 
+    public CameraController cameraController;
+
     private void Start()
     {
         if (Gamepad.all.Count >= 2)
@@ -24,7 +26,11 @@ public class PlayerManager : MonoBehaviour
             {
                 p2Renderer.material.color = Color.blue;
             }
-            
+
+            // Add to camera tracking
+            cameraController.AddTarget(player1.transform);
+            cameraController.AddTarget(player2.transform);
+
             // Assign to tether manager
             tetherManager.player1 = player1.transform;
             tetherManager.player2 = player2.transform;
