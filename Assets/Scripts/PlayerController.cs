@@ -11,10 +11,9 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float _turnSpeed;
 
     private int _jumpCount;
-    [SerializeField] private int _maxJumpCount = 2;
+    [SerializeField] private int _maxJumpCount;
     [SerializeField] private LayerMask _groundLayer;
-    [SerializeField] private float _groundCheckDistance = 0.1f;
-
+    [SerializeField] private float _groundCheckDistance;
     private Rigidbody _rigidbody;
     private Vector3 _input;
     private bool _jumpTriggered;
@@ -28,16 +27,14 @@ public class PlayerController : MonoBehaviour
     }
 
     void Update(){
-        // GatherInput();
-        // Look();
+        Input.GetJoystickNames();
     }
 
     void FixedUpdate(){
-        GatherInput();
         Move();
+        GatherInput();
         Look();
         
-
         bool isGrounded = Physics.Raycast(transform.position, Vector3.down, _groundCheckDistance, _groundLayer);
 
         if (isGrounded){
@@ -47,16 +44,16 @@ public class PlayerController : MonoBehaviour
         // Vector3 velocity = new Vector3(_playerInputController.MovementInputVector.x, 0, _playerInputController.MovementInputVector.y) * _speed;
         // velocity.y = _rigidbody.velocity.y;
 
-        // if(_jumpTriggered){
-        //     velocity.y = _jumpSpeed;
-        //     _jumpTriggered = false;
-        // }
+        if (_jumpTriggered){
+            _rb.AddForce(Vector3.up * _jumpSpeed, ForceMode.Impulse);
+            _jumpTriggered = false;
+        }
 
         // _rigidbody.velocity = velocity; 
     }
 
-    void GatherInput(){
-        _input = new Vector3(Input.GetAxisRaw("Horizontal"), 0, Input.GetAxisRaw("Vertical"));
+    void GatherInput() {
+        _input = new Vector3(_playerInputController.MovementInputVector.x, 0, _playerInputController.MovementInputVector.y);
     }
 
     void Look(){
