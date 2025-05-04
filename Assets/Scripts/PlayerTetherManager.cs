@@ -9,6 +9,7 @@ public class PlayerTetherManager : MonoBehaviour
 
     public int ropeSegments = 20;
     public float ropeSag = 0.5f;
+    public GameObject hitEffectPrefab;
 
     private LineRenderer line;
 
@@ -47,14 +48,32 @@ public class PlayerTetherManager : MonoBehaviour
     }
 
     private void DrawRope(Vector3 start, Vector3 end)
+{
+    for (int i = 0; i < ropeSegments; i++)
     {
-        for (int i = 0; i < ropeSegments; i++)
+        float t = i / (float)(ropeSegments - 1);
+        Vector3 point = Vector3.Lerp(start, end, t);
+        float sagOffset = Mathf.Sin(Mathf.PI * t) * ropeSag;
+        point.y -= sagOffset;
+        line.SetPosition(i, point);
+
+        // Starting from segment 1, cast ray between previous and current segment
+        if (i > 0)
         {
-            float t = i / (float)(ropeSegments - 1);
-            Vector3 point = Vector3.Lerp(start, end, t);
-            float sagOffset = Mathf.Sin(Mathf.PI * t) * ropeSag;
-            point.y -= sagOffset;
-            line.SetPosition(i, point);
+            Vector3 prevPoint = line.GetPosition(i - 1);
+            Vector3 dir = point - prevPoint;
+            float dist = dir.magnitude;
+            Ray ray = new Ray(prevPoint, dir.normalized);
+
+            if (Physics.Raycast(ray, out RaycastHit hit, dist))
+            {
+                if (hit.collider.CompareTag("Enemy"))
+                {
+                    Destroy(hit.collider.gameObject);
+                    Instantiate(hitEffectPrefab, hit.point, Quaternion.identity);
+                }
+            }
         }
     }
+}
 }
