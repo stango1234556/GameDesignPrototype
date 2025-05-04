@@ -102,6 +102,17 @@
                 },
                 {
                     "name": "",
+                    "id": "7dee5439-481b-4fb6-b4de-598e0254dae5",
+                    "path": "<Joystick>/stick",
+                    "interactions": "",
+                    "processors": "",
+                    "groups": "",
+                    "action": "Move",
+                    "isComposite": false,
+                    "isPartOfComposite": false
+                },
+                {
+                    "name": "",
                     "id": "6e2e1cc9-5bce-412c-b157-985412c49248",
                     "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
