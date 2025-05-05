@@ -1719,8 +1719,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   player1: {fileID: 0}
   player2: {fileID: 0}
-  baseMaxDistance: 5
-  minMaxDistance: 2
+  baseMaxDistance: 10
+  minMaxDistance: 0.5
   maxAdjustSpeed: 2
   ropeSegments: 20
   ropeSag: 0.5
