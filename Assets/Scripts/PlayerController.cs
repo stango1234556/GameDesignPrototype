@@ -10,7 +10,10 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private float _jumpSpeed;
     [SerializeField] private float _turnSpeed;
     [SerializeField] private int _maxJumpCount;
-    [SerializeField] private float _groundCheckDistance;
+
+    [Header("Ground Check")]
+    [SerializeField] private Transform groundCheckPoint;
+    [SerializeField] private float groundCheckRadius = 0.2f;
     [SerializeField] private LayerMask _groundLayer;
 
     [Header("Grabbing")]
@@ -35,7 +38,6 @@ public class PlayerController : MonoBehaviour
     private bool _tetherControlActive = false;
     private bool _isAnchored = false;
 
-    // Rotation tracking
     private float _previousStickAngle = 0f;
     private float _cwRotated = 0f;
     private float _ccwRotated = 0f;
@@ -46,6 +48,7 @@ public class PlayerController : MonoBehaviour
         _playerInputController.OnJumpButtonPressed += JumpButtonPressed;
         _playerInputController.OnGrabInputChanged += HandleGrab;
         _playerInputController.OnTetherControlChanged += OnTetherControlChanged;
+        _playerInputController.OnLaunchPressed += TryLaunchTowardPartner;
 
         _tetherManager = FindObjectOfType<PlayerTetherManager>();
         _desiredMaxDistance = _tetherManager.baseMaxDistance;
@@ -68,13 +71,9 @@ public class PlayerController : MonoBehaviour
         GatherInput();
         Look();
 
-        if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, _groundCheckDistance, _groundLayer))
+        if (IsGrounded())
         {
             _jumpCount = 0;
-            _currentPlatform = hit.collider.GetComponent<MovingPlatform>();
-        }
-        else
-        {
             _currentPlatform = null;
         }
 
@@ -133,7 +132,6 @@ public class PlayerController : MonoBehaviour
                 _ccwRotated = 0f;
             }
 
-            // 3D pull (upward + over obstacles)
             Transform otherPlayer = (_tetherManager.player1 == transform) ? _tetherManager.player2 : _tetherManager.player1;
             Rigidbody otherRb = otherPlayer.GetComponent<Rigidbody>();
 
@@ -145,21 +143,9 @@ public class PlayerController : MonoBehaviour
                 if (dist > _tetherManager.currentMaxDistance + 0.1f)
                 {
                     Vector3 pullDir = dir.normalized;
-
-                    float originalDrag = otherRb.drag;
-                    otherRb.drag = 0f;
-
-                    if (Physics.Raycast(otherPlayer.position, Vector3.up, out RaycastHit hitUp, 1f))
-                    {
-                        otherRb.AddForce(Vector3.up * 100f, ForceMode.Acceleration);
-                    }
-
                     float excess = dist - _tetherManager.currentMaxDistance;
-                    float pullStrength = 120f + Mathf.Clamp(excess * 100f, 0f, 500f);
-
-                    otherRb.AddForce(pullDir * pullStrength * Time.fixedDeltaTime, ForceMode.Acceleration);
-
-                    otherRb.drag = originalDrag;
+                    float pullStrength = 5f + Mathf.Clamp(excess * 0.5f, 0, 15f);
+                    otherRb.AddForce(pullDir * pullStrength * Time.fixedDeltaTime, ForceMode.Force);
                 }
             }
         }
@@ -259,6 +245,38 @@ public class PlayerController : MonoBehaviour
 
     private bool IsGrounded()
     {
-        return Physics.Raycast(transform.position, Vector3.down, _groundCheckDistance, _groundLayer);
+        return Physics.CheckSphere(groundCheckPoint.position, groundCheckRadius, _groundLayer);
+    }
+
+    private void OnDrawGizmosSelected()
+    {
+        if (groundCheckPoint != null)
+        {
+            Gizmos.color = Color.green;
+            Gizmos.DrawWireSphere(groundCheckPoint.position, groundCheckRadius);
+        }
+    }
+
+    public bool IsAnchored()
+    {
+        return _isAnchored;
+    }
+
+    private void TryLaunchTowardPartner()
+    {
+        if (_tetherManager == null) return;
+
+        Transform otherPlayer = (_tetherManager.player1 == transform) ? _tetherManager.player2 : _tetherManager.player1;
+        PlayerController otherController = otherPlayer.GetComponent<PlayerController>();
+
+        if (otherController != null && otherController.IsAnchored())
+        {
+            Vector3 dir = (otherPlayer.position - transform.position).normalized;
+            Vector3 launchDir = (dir + Vector3.up * 0.5f).normalized; // Add upward curve
+            float launchForce = 18f;
+
+            _rb.velocity = Vector3.zero;
+            _rb.AddForce(launchDir * launchForce, ForceMode.VelocityChange);
+        }
     }
 }

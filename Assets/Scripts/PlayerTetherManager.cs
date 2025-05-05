@@ -7,7 +7,7 @@ public class PlayerTetherManager : MonoBehaviour
     public Transform player2;
 
     public float baseMaxDistance = 6f;
-    public float minMaxDistance = 1f;
+    public float minMaxDistance = 0.25f;
     public float maxAdjustSpeed = 2f;
 
     public int ropeSegments = 20;
