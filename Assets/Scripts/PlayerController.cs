@@ -239,7 +239,7 @@ public class PlayerController : MonoBehaviour
 
         if (bodyRenderer != null && bodyRenderer.material.HasProperty("_Color"))
         {
-            bodyRenderer.material.color = _isAnchored ? Color.yellow : _baseColor;
+            bodyRenderer.material.color = _isAnchored ? Color.green : _baseColor;
         }
     }
 
