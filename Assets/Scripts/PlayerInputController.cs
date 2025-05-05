@@ -25,12 +25,14 @@ public class PlayerInputController : MonoBehaviour
         MovementInputVector = inputValue.Get<Vector2>();
     }
 
-    private void OnJump(InputValue inputValue)
+    public event Action OnJumpReleased;
+
+    private void OnJump(InputValue value)
     {
-        if (inputValue.isPressed)
-        {
+        if (value.isPressed)
             OnJumpButtonPressed?.Invoke();
-        }
+        else
+            OnJumpReleased?.Invoke();
     }
 
     private void OnGrab(InputValue inputValue)

@@ -6,10 +6,10 @@ public class PlayerController : MonoBehaviour
 {
     [Header("Movement")]
     [SerializeField] private Rigidbody _rb;
-    [SerializeField] private float _speed;
-    [SerializeField] private float _jumpSpeed;
-    [SerializeField] private float _turnSpeed;
-    [SerializeField] private int _maxJumpCount;
+    [SerializeField] private float _speed = 5f;
+    [SerializeField] private float _jumpForce = 7f;
+    [SerializeField] private float _turnSpeed = 720f;
+    [SerializeField] private int _maxJumpCount = 2;
 
     [Header("Ground Check")]
     [SerializeField] private Transform groundCheckPoint;
@@ -24,10 +24,24 @@ public class PlayerController : MonoBehaviour
     [Header("Visual")]
     [SerializeField] private Renderer bodyRenderer;
 
+    [Header("Tether Pull Settings")]
+    [SerializeField] private float basePullForce = 15f;
+    [SerializeField] private float excessMultiplier = 20f;
+    [SerializeField] private float maxPullCap = 100f;
+
+    [Header("Custom Gravity")]
+    [SerializeField] private float customGravity = -9.81f;
+    [SerializeField] private Vector3 gravityDirection = Vector3.down;
+
+    [Header("Jump Feel Tweaks")]
+    [SerializeField] private float fallMultiplier = 2.5f;
+    [SerializeField] private float lowJumpMultiplier = 2f;
+
     private Color _baseColor;
     private Vector3 _input;
-    private bool _jumpTriggered;
     private int _jumpCount;
+    private bool _jumpTriggered;
+    private bool _jumpHeld;
     private PlayerInputController _playerInputController;
     private FixedJoint grabJoint;
     private Rigidbody grabbedRb;
@@ -46,6 +60,7 @@ public class PlayerController : MonoBehaviour
     {
         _playerInputController = GetComponent<PlayerInputController>();
         _playerInputController.OnJumpButtonPressed += JumpButtonPressed;
+        _playerInputController.OnJumpReleased += () => _jumpHeld = false;
         _playerInputController.OnGrabInputChanged += HandleGrab;
         _playerInputController.OnTetherControlChanged += OnTetherControlChanged;
         _playerInputController.OnLaunchPressed += TryLaunchTowardPartner;
@@ -54,9 +69,9 @@ public class PlayerController : MonoBehaviour
         _desiredMaxDistance = _tetherManager.baseMaxDistance;
 
         if (bodyRenderer != null)
-        {
             _baseColor = bodyRenderer.material.color;
-        }
+
+        _rb.useGravity = false;
     }
 
     void FixedUpdate()
@@ -79,10 +94,22 @@ public class PlayerController : MonoBehaviour
 
         if (_jumpTriggered && !_isAnchored)
         {
-            _rb.AddForce(Vector3.up * _jumpSpeed, ForceMode.Impulse);
+            _rb.velocity = new Vector3(_rb.velocity.x, 0f, _rb.velocity.z);
+            _rb.AddForce(Vector3.up * _jumpForce, ForceMode.VelocityChange);
             _jumpTriggered = false;
         }
 
+        // Better jump fall behavior
+        if (_rb.velocity.y < 0)
+        {
+            _rb.AddForce(gravityDirection * customGravity * (fallMultiplier - 1f), ForceMode.Acceleration);
+        }
+        else if (_rb.velocity.y > 0 && !_jumpHeld)
+        {
+            _rb.AddForce(gravityDirection * customGravity * (lowJumpMultiplier - 1f), ForceMode.Acceleration);
+        }
+
+        // Tether logic...
         if (_tetherControlActive && _tetherManager != null)
         {
             Vector2 stick = _playerInputController.RightStickInputVector;
@@ -144,7 +171,7 @@ public class PlayerController : MonoBehaviour
                 {
                     Vector3 pullDir = dir.normalized;
                     float excess = dist - _tetherManager.currentMaxDistance;
-                    float pullStrength = 5f + Mathf.Clamp(excess * 0.5f, 0, 15f);
+                    float pullStrength = basePullForce + Mathf.Clamp(excess * excessMultiplier, 0, maxPullCap);
                     otherRb.AddForce(pullDir * pullStrength * Time.fixedDeltaTime, ForceMode.Force);
                 }
             }
@@ -159,6 +186,9 @@ public class PlayerController : MonoBehaviour
         }
 
         _tetherManager.currentMaxDistance = _desiredMaxDistance;
+
+        // Custom gravity always applied
+        _rb.AddForce(gravityDirection * customGravity, ForceMode.Acceleration);
     }
 
     void GatherInput()
@@ -221,6 +251,7 @@ public class PlayerController : MonoBehaviour
         {
             _jumpTriggered = true;
             _jumpCount++;
+            _jumpHeld = true;
         }
     }
 
@@ -272,7 +303,7 @@ public class PlayerController : MonoBehaviour
         if (otherController != null && otherController.IsAnchored())
         {
             Vector3 dir = (otherPlayer.position - transform.position).normalized;
-            Vector3 launchDir = (dir + Vector3.up * 0.5f).normalized; // Add upward curve
+            Vector3 launchDir = (dir + Vector3.up * 0.5f).normalized;
             float launchForce = 18f;
 
             _rb.velocity = Vector3.zero;
