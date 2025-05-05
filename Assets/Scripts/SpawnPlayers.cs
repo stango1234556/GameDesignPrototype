@@ -3,7 +3,8 @@ using UnityEngine.InputSystem;
 
 public class PlayerManager : MonoBehaviour
 {
-    public GameObject playerPrefab;
+    public GameObject player1Prefab;
+    public GameObject player2Prefab;
     public PlayerTetherManager tetherManager;
 
     public CameraController cameraController;
@@ -12,20 +13,8 @@ public class PlayerManager : MonoBehaviour
     {
         if (Gamepad.all.Count >= 2)
         {
-            var player1 = PlayerInput.Instantiate(playerPrefab, controlScheme: "Gamepad", pairWithDevice: Gamepad.all[0]);
-            // Make player1 red
-            Renderer p1Renderer = player1.GetComponentInChildren<Renderer>();
-            if (p1Renderer != null)
-            {
-                p1Renderer.material.color = Color.red;
-            }
-            var player2 = PlayerInput.Instantiate(playerPrefab, controlScheme: "Gamepad", pairWithDevice: Gamepad.all[1]);
-            // Make player2 blue
-            Renderer p2Renderer = player2.GetComponentInChildren<Renderer>();
-            if (p2Renderer != null)
-            {
-                p2Renderer.material.color = Color.blue;
-            }
+            var player1 = PlayerInput.Instantiate(player1Prefab, controlScheme: "Gamepad", pairWithDevice: Gamepad.all[0]);
+            var player2 = PlayerInput.Instantiate(player2Prefab, controlScheme: "Gamepad", pairWithDevice: Gamepad.all[1]);
 
             // Add to camera tracking
             cameraController.AddTarget(player1.transform);
