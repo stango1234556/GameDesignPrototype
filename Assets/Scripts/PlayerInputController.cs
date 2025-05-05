@@ -1,5 +1,3 @@
-using System.Collections;
-using System.Collections.Generic;
 using System;
 using UnityEngine;
 using UnityEngine.InputSystem;
@@ -7,24 +5,61 @@ using UnityEngine.InputSystem;
 public class PlayerInputController : MonoBehaviour
 {
     public Vector2 MovementInputVector { get; private set; }
+    public Vector2 RightStickInputVector { get; private set; }
 
     public event Action OnJumpButtonPressed;
-
     public event Action<bool> OnGrabInputChanged;
+    public event Action<bool> OnTetherControlChanged;
 
-    private void OnGrab(InputValue inputValue)
+    private bool _leftHeld = false;
+    private bool _rightHeld = false;
+    private PlayerInput _playerInput;
+
+    private void Awake()
     {
-        bool isPressed = inputValue.isPressed;
-        Debug.Log("Grab input: " + isPressed);
-        OnGrabInputChanged?.Invoke(isPressed);
+        _playerInput = GetComponent<PlayerInput>();
     }
-    private void OnMove(InputValue inputValue){
+
+    private void OnMove(InputValue inputValue)
+    {
         MovementInputVector = inputValue.Get<Vector2>();
     }
 
-    private void OnJump(InputValue inputValue){
-        if(inputValue.isPressed){
+    private void OnJump(InputValue inputValue)
+    {
+        if (inputValue.isPressed)
+        {
             OnJumpButtonPressed?.Invoke();
         }
+    }
+
+    private void OnGrab(InputValue inputValue)
+    {
+        OnGrabInputChanged?.Invoke(inputValue.isPressed);
+    }
+
+    private void OnRightStick(InputValue inputValue)
+    {
+        RightStickInputVector = inputValue.Get<Vector2>();
+    }
+
+    private void OnLeftShoulder(InputValue inputValue)
+    {
+        _leftHeld = inputValue.isPressed;
+        CheckTetherControlState();
+    }
+
+    private void OnRightShoulder(InputValue inputValue)
+    {
+        _rightHeld = inputValue.isPressed;
+        CheckTetherControlState();
+    }
+
+    private void CheckTetherControlState()
+    {
+        var gamepad = _playerInput.devices[0] as Gamepad;
+        bool bothHeld = _leftHeld && _rightHeld;
+        
+        OnTetherControlChanged?.Invoke(bothHeld);
     }
 }

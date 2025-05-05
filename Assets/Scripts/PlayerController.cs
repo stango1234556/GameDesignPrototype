@@ -4,46 +4,66 @@ using UnityEngine;
 
 public class PlayerController : MonoBehaviour
 {
+    [Header("Movement")]
     [SerializeField] private Rigidbody _rb;
-
     [SerializeField] private float _speed;
     [SerializeField] private float _jumpSpeed;
     [SerializeField] private float _turnSpeed;
-
-    private int _jumpCount;
     [SerializeField] private int _maxJumpCount;
-    [SerializeField] private LayerMask _groundLayer;
     [SerializeField] private float _groundCheckDistance;
-    private Rigidbody _rigidbody;
-    private Vector3 _input;
-    private bool _jumpTriggered;
-    private PlayerInputController _playerInputController;
+    [SerializeField] private LayerMask _groundLayer;
 
+    [Header("Grabbing")]
     [SerializeField] private Transform grabPoint;
     [SerializeField] private float grabRange = 1.5f;
     [SerializeField] private LayerMask grabbableLayer;
+
+    [Header("Visual")]
+    [SerializeField] private Renderer bodyRenderer;
+
+    private Color _baseColor;
+    private Vector3 _input;
+    private bool _jumpTriggered;
+    private int _jumpCount;
+    private PlayerInputController _playerInputController;
     private FixedJoint grabJoint;
     private Rigidbody grabbedRb;
-
-    // New: reference to the current platform
     private MovingPlatform _currentPlatform;
+
+    private PlayerTetherManager _tetherManager;
+    private float _desiredMaxDistance;
+    private bool _tetherControlActive = false;
+    private bool _isAnchored = false;
+
+    // Rotation tracking
+    private float _previousStickAngle = 0f;
+    private float _cwRotated = 0f;
+    private float _ccwRotated = 0f;
 
     private void Awake()
     {
         _playerInputController = GetComponent<PlayerInputController>();
-        _rigidbody = GetComponent<Rigidbody>();
-
         _playerInputController.OnJumpButtonPressed += JumpButtonPressed;
         _playerInputController.OnGrabInputChanged += HandleGrab;
-    }
+        _playerInputController.OnTetherControlChanged += OnTetherControlChanged;
 
-    void Update()
-    {
-        Input.GetJoystickNames();
+        _tetherManager = FindObjectOfType<PlayerTetherManager>();
+        _desiredMaxDistance = _tetherManager.baseMaxDistance;
+
+        if (bodyRenderer != null)
+        {
+            _baseColor = bodyRenderer.material.color;
+        }
     }
 
     void FixedUpdate()
     {
+        if (_isAnchored)
+        {
+            _rb.velocity = Vector3.zero;
+            _rb.angularVelocity = Vector3.zero;
+        }
+
         Move();
         GatherInput();
         Look();
@@ -51,8 +71,6 @@ public class PlayerController : MonoBehaviour
         if (Physics.Raycast(transform.position, Vector3.down, out RaycastHit hit, _groundCheckDistance, _groundLayer))
         {
             _jumpCount = 0;
-
-            // Check if we're on a moving platform
             _currentPlatform = hit.collider.GetComponent<MovingPlatform>();
         }
         else
@@ -60,11 +78,101 @@ public class PlayerController : MonoBehaviour
             _currentPlatform = null;
         }
 
-        if (_jumpTriggered)
+        if (_jumpTriggered && !_isAnchored)
         {
             _rb.AddForce(Vector3.up * _jumpSpeed, ForceMode.Impulse);
             _jumpTriggered = false;
         }
+
+        if (_tetherControlActive && _tetherManager != null)
+        {
+            Vector2 stick = _playerInputController.RightStickInputVector;
+
+            if (stick.magnitude > 0.3f)
+            {
+                float angle = Mathf.Atan2(stick.y, stick.x) * Mathf.Rad2Deg;
+                float deltaAngle = Mathf.DeltaAngle(_previousStickAngle, angle);
+
+                if (deltaAngle < 0)
+                {
+                    _cwRotated += -deltaAngle;
+                    _ccwRotated = 0f;
+                }
+                else if (deltaAngle > 0)
+                {
+                    _ccwRotated += deltaAngle;
+                    _cwRotated = 0f;
+                }
+
+                _previousStickAngle = angle;
+
+                if (_cwRotated >= 90f)
+                {
+                    _desiredMaxDistance = Mathf.Clamp(
+                        _tetherManager.currentMaxDistance - 0.5f,
+                        _tetherManager.minMaxDistance,
+                        _tetherManager.baseMaxDistance
+                    );
+                    _cwRotated = 0f;
+                }
+
+                if (_ccwRotated >= 90f)
+                {
+                    _desiredMaxDistance = Mathf.Clamp(
+                        _tetherManager.currentMaxDistance + 0.5f,
+                        _tetherManager.minMaxDistance,
+                        _tetherManager.baseMaxDistance
+                    );
+                    _ccwRotated = 0f;
+                }
+            }
+            else
+            {
+                _previousStickAngle = 0f;
+                _cwRotated = 0f;
+                _ccwRotated = 0f;
+            }
+
+            // 3D pull (upward + over obstacles)
+            Transform otherPlayer = (_tetherManager.player1 == transform) ? _tetherManager.player2 : _tetherManager.player1;
+            Rigidbody otherRb = otherPlayer.GetComponent<Rigidbody>();
+
+            if (otherRb != null)
+            {
+                Vector3 dir = transform.position - otherPlayer.position;
+                float dist = dir.magnitude;
+
+                if (dist > _tetherManager.currentMaxDistance + 0.1f)
+                {
+                    Vector3 pullDir = dir.normalized;
+
+                    float originalDrag = otherRb.drag;
+                    otherRb.drag = 0f;
+
+                    if (Physics.Raycast(otherPlayer.position, Vector3.up, out RaycastHit hitUp, 1f))
+                    {
+                        otherRb.AddForce(Vector3.up * 100f, ForceMode.Acceleration);
+                    }
+
+                    float excess = dist - _tetherManager.currentMaxDistance;
+                    float pullStrength = 120f + Mathf.Clamp(excess * 100f, 0f, 500f);
+
+                    otherRb.AddForce(pullDir * pullStrength * Time.fixedDeltaTime, ForceMode.Acceleration);
+
+                    otherRb.drag = originalDrag;
+                }
+            }
+        }
+        else
+        {
+            _desiredMaxDistance = Mathf.MoveTowards(
+                _tetherManager.currentMaxDistance,
+                _tetherManager.baseMaxDistance,
+                _tetherManager.maxAdjustSpeed * Time.fixedDeltaTime
+            );
+        }
+
+        _tetherManager.currentMaxDistance = _desiredMaxDistance;
     }
 
     void GatherInput()
@@ -79,7 +187,6 @@ public class PlayerController : MonoBehaviour
             if (grabJoint != null) return;
 
             Collider[] hits = Physics.OverlapSphere(grabPoint.position, grabRange);
-
             foreach (var hit in hits)
             {
                 if (hit.CompareTag("Grabbable") && hit.attachedRigidbody != null)
@@ -109,13 +216,14 @@ public class PlayerController : MonoBehaviour
         {
             var relative = (transform.position + _input.ToIso()) - transform.position;
             var rot = Quaternion.LookRotation(relative, Vector3.up);
-
             transform.rotation = Quaternion.RotateTowards(transform.rotation, rot, _turnSpeed * Time.deltaTime);
         }
     }
 
     void Move()
     {
+        if (_isAnchored) return;
+
         Vector3 platformDelta = _currentPlatform != null ? _currentPlatform.DeltaMovement : Vector3.zero;
         Vector3 movement = (transform.forward * _input.magnitude) * _speed * Time.deltaTime;
         _rb.MovePosition(transform.position + movement + platformDelta);
@@ -123,10 +231,34 @@ public class PlayerController : MonoBehaviour
 
     private void JumpButtonPressed()
     {
-        if (_jumpCount < _maxJumpCount)
+        if (_jumpCount < _maxJumpCount && !_isAnchored)
         {
             _jumpTriggered = true;
             _jumpCount++;
         }
+    }
+
+    private void OnTetherControlChanged(bool isHeld)
+    {
+        _tetherControlActive = isHeld;
+
+        if (isHeld && IsGrounded())
+        {
+            _isAnchored = true;
+        }
+        else
+        {
+            _isAnchored = false;
+        }
+
+        if (bodyRenderer != null && bodyRenderer.material.HasProperty("_Color"))
+        {
+            bodyRenderer.material.color = _isAnchored ? Color.yellow : _baseColor;
+        }
+    }
+
+    private bool IsGrounded()
+    {
+        return Physics.Raycast(transform.position, Vector3.down, _groundCheckDistance, _groundLayer);
     }
 }

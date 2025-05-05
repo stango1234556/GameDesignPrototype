@@ -5,16 +5,22 @@ public class PlayerTetherManager : MonoBehaviour
 {
     public Transform player1;
     public Transform player2;
-    public float maxDistance = 5f;
+
+    public float baseMaxDistance = 6f;
+    public float minMaxDistance = 1f;
+    public float maxAdjustSpeed = 2f;
 
     public int ropeSegments = 20;
     public float ropeSag = 0.5f;
-    public GameObject hitEffectPrefab;
+    public GameObject hitEffectPrefab; 
+
+    [HideInInspector] public float currentMaxDistance;
 
     private LineRenderer line;
 
     private void Awake()
     {
+        currentMaxDistance = baseMaxDistance;
         line = GetComponent<LineRenderer>();
         line.positionCount = ropeSegments;
         line.material = new Material(Shader.Find("Sprites/Default"));
@@ -30,50 +36,55 @@ public class PlayerTetherManager : MonoBehaviour
         Vector3 end = player2.position;
         float currentDistance = Vector3.Distance(start, end);
 
-        // Calculate rope color based on tension
-        float tension = Mathf.Clamp01(currentDistance / maxDistance); // 0 = close, 1 = max
-        Color ropeColor = Color.Lerp(Color.yellow, Color.red, tension);
+        // Tension color (bright red to darker red)
+        float tension = Mathf.Clamp01(currentDistance / currentMaxDistance);
+        Color brightRed = new Color(1f, 0f, 0f);
+        Color darkRed = new Color(0.6f, 0.1f, 0.1f);
+        Color ropeColor = Color.Lerp(brightRed, darkRed, tension);
         line.startColor = ropeColor;
         line.endColor = ropeColor;
 
         DrawRope(start, end);
 
-        // Enforce max distance
-        if (currentDistance > maxDistance)
+        // Soft enforcement
+        if (currentDistance > currentMaxDistance)
         {
-            Vector3 correction = (start - end).normalized * (currentDistance - maxDistance) / 2;
-            player1.position -= correction;
-            player2.position += correction;
+            Vector3 direction = (start - end).normalized;
+            float excess = currentDistance - currentMaxDistance;
+
+            Rigidbody rb1 = player1.GetComponent<Rigidbody>();
+            Rigidbody rb2 = player2.GetComponent<Rigidbody>();
+
+            if (rb1 != null) rb1.AddForce(-direction * excess * 2f);
+            if (rb2 != null) rb2.AddForce(direction * excess * 2f);
         }
     }
 
     private void DrawRope(Vector3 start, Vector3 end)
-{
-    for (int i = 0; i < ropeSegments; i++)
     {
-        float t = i / (float)(ropeSegments - 1);
-        Vector3 point = Vector3.Lerp(start, end, t);
-        float sagOffset = Mathf.Sin(Mathf.PI * t) * ropeSag;
-        point.y -= sagOffset;
-        line.SetPosition(i, point);
-
-        // Starting from segment 1, cast ray between previous and current segment
-        if (i > 0)
+        for (int i = 0; i < ropeSegments; i++)
         {
-            Vector3 prevPoint = line.GetPosition(i - 1);
-            Vector3 dir = point - prevPoint;
-            float dist = dir.magnitude;
-            Ray ray = new Ray(prevPoint, dir.normalized);
+            float t = i / (float)(ropeSegments - 1);
+            Vector3 point = Vector3.Lerp(start, end, t);
+            float sagOffset = Mathf.Sin(Mathf.PI * t) * ropeSag;
+            point.y -= sagOffset;
+            line.SetPosition(i, point);
 
-            if (Physics.Raycast(ray, out RaycastHit hit, dist))
+            if (i > 0)
             {
-                if (hit.collider.CompareTag("Enemy"))
+                Vector3 prevPoint = line.GetPosition(i - 1);
+                Vector3 dir = point - prevPoint;
+                float dist = dir.magnitude;
+
+                if (Physics.Raycast(prevPoint, dir.normalized, out RaycastHit hit, dist))
                 {
-                    Destroy(hit.collider.gameObject);
-                    Instantiate(hitEffectPrefab, hit.point, Quaternion.identity);
+                    if (hit.collider.CompareTag("Enemy"))
+                    {
+                        Destroy(hit.collider.gameObject);
+                        Instantiate(hitEffectPrefab, hit.point, Quaternion.identity);
+                    }
                 }
             }
         }
     }
-}
 }
