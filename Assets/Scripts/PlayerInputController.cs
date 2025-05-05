@@ -62,4 +62,14 @@ public class PlayerInputController : MonoBehaviour
         
         OnTetherControlChanged?.Invoke(bothHeld);
     }
+
+    public event Action OnLaunchPressed;
+
+    private void OnWest(InputValue value)
+    {
+        if (value.isPressed)
+        {
+            OnLaunchPressed?.Invoke();
+        }
+    }
 }
