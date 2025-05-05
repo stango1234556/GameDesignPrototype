@@ -147,7 +147,7 @@ Rigidbody:
     m_Bits: 0
   m_ImplicitCom: 1
   m_ImplicitTensor: 1
-  m_UseGravity: 1
+  m_UseGravity: 0
   m_IsKinematic: 0
   m_Interpolate: 1
   m_Constraints: 112
@@ -204,7 +204,7 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _rb: {fileID: 6293264427143431141}
   _speed: 7
-  _jumpSpeed: 5
+  _jumpForce: 6
   _turnSpeed: 540
   _maxJumpCount: 1
   groundCheckPoint: {fileID: 3766696778025114967}
@@ -218,6 +218,13 @@ MonoBehaviour:
     serializedVersion: 2
     m_Bits: 8
   bodyRenderer: {fileID: 5594122960710481831}
+  basePullForce: 5
+  excessMultiplier: 0.25
+  maxPullCap: 10
+  customGravity: -9.81
+  gravityDirection: {x: 0, y: 1, z: 0}
+  fallMultiplier: 2.5
+  lowJumpMultiplier: 2
 --- !u!1 &3356027194828785005
 GameObject:
   m_ObjectHideFlags: 0
